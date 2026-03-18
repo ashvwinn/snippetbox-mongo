@@ -230,6 +230,9 @@ button:hover {
     padding: 18px;
     border-top: 1px solid #E4E5E7;
     border-bottom: 1px solid #E4E5E7;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .snippet .metadata {
@@ -282,10 +285,12 @@ table {
     border: 1px solid #E4E5E7;
     border-collapse: collapse;
     width: 100%;
+    table-layout: fixed;
 }
 
 td, th {
     text-align: left;
+    overflow-wrap: break-word;
     padding: 9px 18px;
 }
 
