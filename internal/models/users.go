@@ -15,14 +15,18 @@ type UserModelInterface interface {
 	Insert(name, email, password string) error
 	Authenticate(email, password string) (string, error)
 	Exists(id string) (bool, error)
+	AddSnippet(userID, snippetID string) error
+	IsSnippetOwner(userID, snippetID string) (bool, error)
+	RemoveSnippet(userID, snippetID string) error
 }
 
 type User struct {
-	ID             primitive.ObjectID `bson:"_id,omitempty"`
-	Name           string             `bson:"name"`
-	Email          string             `bson:"email"`
-	HashedPassword []byte             `bson:"hashed_password"`
-	Created        time.Time          `bson:"created"`
+	ID             primitive.ObjectID   `bson:"_id,omitempty"`
+	Name           string               `bson:"name"`
+	Email          string               `bson:"email"`
+	HashedPassword []byte               `bson:"hashed_password"`
+	Created        time.Time            `bson:"created"`
+	Snippets       []primitive.ObjectID `bson:"snippets,omitempty"`
 }
 
 type UserModel struct {
@@ -95,4 +99,69 @@ func (m *UserModel) Exists(id string) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+func (m *UserModel) AddSnippet(userID, snippetID string) error {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	snippetObjID, err := primitive.ObjectIDFromHex(snippetID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{"_id": userObjID}
+	update := bson.M{"$addToSet": bson.M{"snippets": snippetObjID}}
+
+	_, err = m.Users.UpdateOne(context.TODO(), filter, update)
+	return err
+}
+
+func (m *UserModel) IsSnippetOwner(userID, snippetID string) (bool, error) {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	snippetObjID, err := primitive.ObjectIDFromHex(snippetID)
+	if err != nil {
+		return false, err
+	}
+
+	var user User
+	err = m.Users.FindOne(context.TODO(), bson.M{"_id": userObjID}).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	for _, sID := range user.Snippets {
+		if sID == snippetObjID {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (m *UserModel) RemoveSnippet(userID, snippetID string) error {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	snippetObjID, err := primitive.ObjectIDFromHex(snippetID)
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{"_id": userObjID}
+	update := bson.M{"$pull": bson.M{"snippets": snippetObjID}}
+
+	_, err = m.Users.UpdateOne(context.TODO(), filter, update)
+	return err
 }

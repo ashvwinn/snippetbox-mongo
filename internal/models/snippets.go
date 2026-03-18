@@ -12,9 +12,10 @@ import (
 )
 
 type SnippetModelInterface interface {
-	Insert(title, content string, expires int) (string, error)
+	Insert(title, content string, expires int, userId string) (string, error)
 	Get(id string) (Snippet, error)
 	Latest() ([]Snippet, error)
+	Delete(id string) error
 }
 
 type Snippet struct {
@@ -23,13 +24,19 @@ type Snippet struct {
 	Content string             `bson:"content"`
 	Created time.Time          `bson:"created"`
 	Expires time.Time          `bson:"expires"`
+	UserID  primitive.ObjectID `bson:"user_id,omitempty"`
 }
 
 type SnippetModel struct {
 	Snippets *mongo.Collection
 }
 
-func (m *SnippetModel) Insert(title string, content string, expires int) (string, error) {
+func (m *SnippetModel) Insert(title string, content string, expires int, userId string) (string, error) {
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		return "", err
+	}
+
 	now := time.Now().UTC()
 
 	doc := bson.M{
@@ -37,6 +44,7 @@ func (m *SnippetModel) Insert(title string, content string, expires int) (string
 		"content": content,
 		"created": now,
 		"expires": now.AddDate(0, 0, expires),
+		"user_id": userObjID,
 	}
 
 	res, err := m.Snippets.InsertOne(context.TODO(), doc)
@@ -101,4 +109,22 @@ func (m *SnippetModel) Latest() ([]Snippet, error) {
 	}
 
 	return snippets, nil
+}
+
+func (m *SnippetModel) Delete(id string) error {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return ErrNoRecord
+	}
+
+	res, err := m.Snippets.DeleteOne(context.TODO(), bson.M{"_id": objID})
+	if err != nil {
+		return err
+	}
+
+	if res.DeletedCount == 0 {
+		return ErrNoRecord
+	}
+
+	return nil
 }
