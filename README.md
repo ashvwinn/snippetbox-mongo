@@ -1,11 +1,11 @@
 # SnippetBox
-SnippetBox is a simple web application for storing and sharing text snippets on the web.
+SnippetBox is a simple web application for storing and sharing text snippets on the web built with Go and MongoDB.
 
 
 # Installation
 1. Clone the repository:
 ```bash
-git clone https://github.com/ashvwinn/snippetbox.git
+git clone https://github.com/ashvwinn/snippetbox-mongo.git
 cd snippetbox
 ```
 
@@ -16,12 +16,7 @@ cd snippetbox
 docker compose up -d
 ```
 
-4. Run database migrations with the [`migrate`](https://github.com/golang-migrate/migrate/tree/master/cmd/migrate) tool:
-```bash
-migrate -path=./migrations -database=$SNIPPETBOX_DB_DSN_MIGRATE up
-```
-
-5. Start the application:
+4. Start the application:
 With `go` or with [`air`](https://github.com/air-verse/air)
 ```bash
 air
