@@ -1,9 +1,13 @@
 package models
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type SnippetModelInterface interface {
@@ -21,69 +25,72 @@ type Snippet struct {
 }
 
 type SnippetModel struct {
-	DB *sql.DB
+	Snippets *mongo.Collection
 }
 
 func (m *SnippetModel) Insert(title string, content string, expires int) (int, error) {
-	stmt := `INSERT INTO snippets (title, content, created, expires)
-    VALUES(?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`
+	now := time.Now().UTC()
 
-	result, err := m.DB.Exec(stmt, title, content, expires)
+	doc := bson.M{
+		"title":   title,
+		"content": content,
+		"created": now,
+		"expires": now.AddDate(0, 0, expires),
+	}
+
+	res, err := m.Snippets.InsertOne(context.TODO(), doc)
 	if err != nil {
 		return 0, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-
-	return int(id), err
+	return res.InsertedID.(int), err
 }
 
 func (m *SnippetModel) Get(id int) (Snippet, error) {
 	var s Snippet
 
-	stmt := `SELECT id, title, content, created, expires FROM snippets
-    WHERE expires > UTC_TIMESTAMP() AND id = ?`
+	filter := bson.M{
+		"id":      id,
+		"expires": bson.M{"$gt": time.Now().UTC()},
+	}
 
-	row := m.DB.QueryRow(stmt, id)
-	err := row.Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires)
-	// err := m.DB.QueryRow(stmt, id).Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires) -- Shorthand
+	err := m.Snippets.FindOne(context.TODO(), filter).Decode(&s)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Snippet{}, ErrNoRecord
-		} else {
-			return Snippet{}, err
 		}
+		return Snippet{}, err
 	}
 
 	return s, nil
 }
 
 func (m *SnippetModel) Latest() ([]Snippet, error) {
-	stmt := `SELECT id, title, content, created, expires FROM snippets
-    WHERE expires > UTC_TIMESTAMP() ORDER BY id DESC LIMIT 10`
+	filter := bson.M{
+		"expires": bson.M{"$gt": time.Now().UTC()},
+	}
 
-	rows, err := m.DB.Query(stmt)
+	opts := options.Find().
+		SetSort(bson.D{{Key: "id", Value: -1}}).
+		SetLimit(10)
+
+	cursor, err := m.Snippets.Find(context.TODO(), filter, opts)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(context.TODO())
 
 	var snippets []Snippet
-	for rows.Next() {
-		var s Snippet
 
-		err = rows.Scan(&s.ID, &s.Title, &s.Content, &s.Created, &s.Expires)
-		if err != nil {
+	for cursor.Next(context.TODO()) {
+		var s Snippet
+		if err := cursor.Decode(&s); err != nil {
 			return nil, err
 		}
-
 		snippets = append(snippets, s)
 	}
 
-	if err = rows.Err(); err != nil {
+	if err := cursor.Err(); err != nil {
 		return nil, err
 	}
 

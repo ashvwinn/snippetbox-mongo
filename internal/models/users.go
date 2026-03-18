@@ -1,12 +1,12 @@
 package models
 
 import (
-	"database/sql"
+	"context"
 	"errors"
-	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,7 +25,7 @@ type User struct {
 }
 
 type UserModel struct {
-	DB *sql.DB
+	Users *mongo.Collection
 }
 
 func (m *UserModel) Insert(name, email, password string) error {
@@ -34,15 +34,22 @@ func (m *UserModel) Insert(name, email, password string) error {
 		return err
 	}
 
-	stmt := `INSERT INTO users (name, email, hashed_password, created)
-    VALUES(?, ?, ?, UTC_TIMESTAMP())`
+	doc := bson.M{
+		"name":            name,
+		"email":           email,
+		"hashed_password": string(hashedPassword),
+		"created":         time.Now().UTC(),
+	}
 
-	_, err = m.DB.Exec(stmt, name, email, hashedPassword)
+	_, err = m.Users.InsertOne(context.TODO(), doc)
 	if err != nil {
-		var mySQLError *mysql.MySQLError
-		if errors.As(err, &mySQLError) {
-			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "users_uc_email") {
-				return ErrDuplicateEmail
+		// Handle duplicate email
+		var writeErr mongo.WriteException
+		if errors.As(err, &writeErr) {
+			for _, e := range writeErr.WriteErrors {
+				if e.Code == 11000 { // duplicate key error
+					return ErrDuplicateEmail
+				}
 			}
 		}
 		return err
@@ -52,41 +59,39 @@ func (m *UserModel) Insert(name, email, password string) error {
 }
 
 func (m *UserModel) Authenticate(email, password string) (int, error) {
-	var id int
-	var hashedPassword []byte
-
-	stmt := "SELECT id, hashed_password FROM users WHERE email = ?"
-
-	err := m.DB.QueryRow(stmt, email).Scan(&id, &hashedPassword)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, ErrInvalidCredentials
-		} else {
-			return 0, err
-		}
+	var user struct {
+		ID             int    `bson:"id"`
+		HashedPassword string `bson:"hashed_password"`
 	}
 
-	err = bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
+	filter := bson.M{
+		"email": email,
+	}
+
+	err := m.Users.FindOne(context.TODO(), filter).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return 0, ErrInvalidCredentials
+		}
+		return 0, err
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(password))
 	if err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return 0, ErrInvalidCredentials
-		} else {
-			return 0, err
 		}
+		return 0, err
 	}
 
-	return id, nil
+	return user.ID, nil
 }
 
 func (m *UserModel) Exists(id int) (bool, error) {
-	var exists bool
-
-	stmt := "SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)"
-
-	err := m.DB.QueryRow(stmt, id).Scan(&exists)
+	count, err := m.Users.CountDocuments(context.TODO(), bson.M{"id": id})
 	if err != nil {
 		return false, err
 	}
 
-	return exists, nil
+	return count > 0, nil
 }

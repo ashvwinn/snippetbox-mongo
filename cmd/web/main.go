@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
-	"database/sql"
 	"flag"
 	"html/template"
 	"log/slog"
@@ -11,11 +11,13 @@ import (
 	"time"
 
 	"github.com/ASH-WIN-10/snippetbox/internal/models"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
-	"github.com/alexedwards/scs/mysqlstore"
+	"github.com/alexedwards/scs/mongodbstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
 
@@ -28,17 +30,19 @@ type application struct {
 	sessionManager *scs.SessionManager
 }
 
-func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn)
+func openDB(dsn string) (*mongo.Database, error) {
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(dsn))
 	if err != nil {
 		return nil, err
 	}
 
-	err = db.Ping()
+	err = client.Ping(context.TODO(), readpref.Primary())
 	if err != nil {
-		db.Close()
+		client.Disconnect(context.TODO())
 		return nil, err
 	}
+
+	db := client.Database("snippetbox")
 
 	return db, nil
 }
@@ -53,7 +57,7 @@ func main() {
 	}
 
 	addr := flag.String("addr", ":4000", "HTTP network address")
-	dsn := flag.String("dsn", os.Getenv("SNIPPETBOX_DB_DSN"), "MySQL data source name")
+	dsn := flag.String("dsn", os.Getenv("SNIPPETBOX_URI"), "MongoDB data source name")
 	flag.Parse()
 
 	db, err := openDB(*dsn)
@@ -61,7 +65,7 @@ func main() {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer db.Client().Disconnect(context.Background())
 
 	templateCache, err := newTemplateCache()
 	if err != nil {
@@ -72,14 +76,14 @@ func main() {
 	formDecoder := form.NewDecoder()
 
 	sessionManager := scs.New()
-	sessionManager.Store = mysqlstore.New(db)
+	sessionManager.Store = mongodbstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
 	sessionManager.Cookie.Secure = true
 
 	app := &application{
 		logger:         logger,
-		snippets:       &models.SnippetModel{DB: db},
-		users:          &models.UserModel{DB: db},
+		snippets:       &models.SnippetModel{Snippets: db.Collection("snippets")},
+		users:          &models.UserModel{Users: db.Collection("users")},
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
