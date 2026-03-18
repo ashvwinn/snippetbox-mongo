@@ -1,11 +1,11 @@
-{{define "title"}}Snippet #{{.Snippet.ID}}{{end}}
+{{define "title"}}Snippet #{{.Snippet.ID.Hex}}{{end}}
 
 {{define "main"}}
     {{with .Snippet}}
         <div class="snippet">
             <div class="metadata">
                 <strong>{{.Title}}</strong>
-                <span>#{{.ID}}</span>
+                <span>#{{.ID.Hex}}</span>
             </div>
             <pre><code>{{.Content}}</code></pre>
             <div class="metadata">

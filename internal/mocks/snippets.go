@@ -4,10 +4,13 @@ import (
 	"time"
 
 	"github.com/ASH-WIN-10/snippetbox/internal/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+var mockSnippetID = primitive.NewObjectID()
+
 var mockSnippet = models.Snippet{
-	ID:      1,
+	ID:      mockSnippetID,
 	Title:   "An old silent pond",
 	Content: "An old silent pond...",
 	Created: time.Now(),
@@ -16,17 +19,15 @@ var mockSnippet = models.Snippet{
 
 type SnippetModel struct{}
 
-func (m *SnippetModel) Insert(title, content string, expires int) (int, error) {
-	return 2, nil
+func (m *SnippetModel) Insert(title, content string, expires int) (string, error) {
+	return primitive.NewObjectID().Hex(), nil
 }
 
-func (m *SnippetModel) Get(id int) (models.Snippet, error) {
-	switch id {
-	case 1:
+func (m *SnippetModel) Get(id string) (models.Snippet, error) {
+	if id == mockSnippetID.Hex() {
 		return mockSnippet, nil
-	default:
-		return models.Snippet{}, models.ErrNoRecord
 	}
+	return models.Snippet{}, models.ErrNoRecord
 }
 
 func (m *SnippetModel) Latest() ([]models.Snippet, error) {

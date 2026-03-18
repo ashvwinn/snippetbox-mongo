@@ -10,7 +10,12 @@ services:
             MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD} 
             MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
         volumes:
-            - mongo_data:/data/db
+            - mongo-data:/data/db
+            - mongo-config:/data/configdb # Persist MongoDB configuration
 
 volumes:
-    mongo_data:
+    mongo-data:
+        driver: local
+    mongo-config:
+        driver: local
+

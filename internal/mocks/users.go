@@ -2,6 +2,8 @@ package mocks
 
 import "github.com/ASH-WIN-10/snippetbox/internal/models"
 
+var mockUserID = "65a1b2c3d4e5f67890abcdef"
+
 type UserModel struct{}
 
 func (m *UserModel) Insert(name, email, password string) error {
@@ -13,17 +15,17 @@ func (m *UserModel) Insert(name, email, password string) error {
 	}
 }
 
-func (m *UserModel) Authenticate(email, password string) (int, error) {
+func (m *UserModel) Authenticate(email, password string) (string, error) {
 	if email == "alice@example.com" && password == "pa$$word" {
-		return 1, nil
+		return mockUserID, nil
 	}
 
-	return 0, models.ErrInvalidCredentials
+	return "", models.ErrInvalidCredentials
 }
 
-func (m *UserModel) Exists(id int) (bool, error) {
+func (m *UserModel) Exists(id string) (bool, error) {
 	switch id {
-	case 1:
+	case mockUserID:
 		return true, nil
 	default:
 		return false, nil
