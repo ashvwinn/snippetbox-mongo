@@ -14,6 +14,7 @@ import (
 type SnippetModelInterface interface {
 	Insert(title, content string, expires int, userId string) (string, error)
 	Get(id string) (Snippet, error)
+	GetByUserID(userID string) ([]Snippet, error)
 	Latest() ([]Snippet, error)
 	Delete(id string) error
 	Update(id, title, content string, expires int) error
@@ -78,6 +79,41 @@ func (m *SnippetModel) Get(id string) (Snippet, error) {
 	}
 
 	return s, nil
+}
+
+func (m *SnippetModel) GetByUserID(userID string) ([]Snippet, error) {
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := bson.M{
+		"user_id": userObjID,
+	}
+
+	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: -1}})
+
+	cursor, err := m.Snippets.Find(context.TODO(), filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.TODO())
+
+	var snippets []Snippet
+
+	for cursor.Next(context.TODO()) {
+		var s Snippet
+		if err := cursor.Decode(&s); err != nil {
+			return nil, err
+		}
+		snippets = append(snippets, s)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return snippets, nil
 }
 
 func (m *SnippetModel) Latest() ([]Snippet, error) {

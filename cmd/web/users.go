@@ -117,3 +117,22 @@ func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+
+func (app *application) userSnippets(w http.ResponseWriter, r *http.Request) {
+	userId := app.sessionManager.GetString(r.Context(), "authenticatedUserID")
+	if userId == "" {
+		app.clientError(w, http.StatusUnauthorized)
+		return
+	}
+
+	snippets, err := app.snippets.GetByUserID(userId)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	data := app.newTemplateData(r)
+	data.Snippets = snippets
+
+	app.render(w, r, http.StatusOK, "user_snippets.tmpl.html", data)
+}
