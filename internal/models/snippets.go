@@ -16,6 +16,7 @@ type SnippetModelInterface interface {
 	Get(id string) (Snippet, error)
 	Latest() ([]Snippet, error)
 	Delete(id string) error
+	Update(id, title, content string, expires int) error
 }
 
 type Snippet struct {
@@ -123,6 +124,32 @@ func (m *SnippetModel) Delete(id string) error {
 	}
 
 	if res.DeletedCount == 0 {
+		return ErrNoRecord
+	}
+
+	return nil
+}
+
+func (m *SnippetModel) Update(id, title, content string, expires int) error {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return ErrNoRecord
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"title":   title,
+			"content": content,
+			"expires": time.Now().UTC().AddDate(0, 0, expires),
+		},
+	}
+
+	res, err := m.Snippets.UpdateOne(context.TODO(), bson.M{"_id": objID}, update)
+	if err != nil {
+		return err
+	}
+
+	if res.MatchedCount == 0 {
 		return ErrNoRecord
 	}
 
