@@ -91,8 +91,16 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	userId := app.sessionManager.GetString(r.Context(), "authenticatedUserID")
+
 	// Insert in db
-	id, err := app.snippets.Insert(form.Title, form.Content, form.Expires)
+	snippetId, err := app.snippets.Insert(form.Title, form.Content, form.Expires, userId)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	err = app.users.AddSnippet(userId, snippetId)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -100,7 +108,48 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 
 	app.sessionManager.Put(r.Context(), "flash", "Snippet successfully created!")
 
-	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%s", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%s", snippetId), http.StatusSeeOther)
+}
+
+func (app *application) snippetDeletePost(w http.ResponseWriter, r *http.Request) {
+	snippetId := r.PathValue("id")
+	if snippetId == "" {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	userId := app.sessionManager.GetString(r.Context(), "authenticatedUserID")
+	bool, err := app.users.IsSnippetOwner(userId, snippetId)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	if !bool {
+		app.clientError(w, http.StatusForbidden)
+		return
+	}
+
+	err = app.snippets.Delete(snippetId)
+	if err != nil {
+		switch {
+		case errors.Is(err, models.ErrNoRecord):
+			http.NotFound(w, r)
+		default:
+			app.serverError(w, r, err)
+		}
+		return
+	}
+
+	err = app.users.RemoveSnippet(userId, snippetId)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	app.sessionManager.Put(r.Context(), "flash", "Snippet deleted successfully!")
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {

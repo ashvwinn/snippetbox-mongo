@@ -10,6 +10,7 @@ import (
 	"github.com/ASH-WIN-10/snippetbox/internal/models"
 	"github.com/ASH-WIN-10/snippetbox/ui"
 	"github.com/justinas/nosurf"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type TemplateData struct {
@@ -19,6 +20,7 @@ type TemplateData struct {
 	Form            any
 	Flash           string
 	IsAuthenticated bool
+	CurrentUserID   string
 	CSRFToken       string
 }
 
@@ -27,6 +29,7 @@ func (app *application) newTemplateData(r *http.Request) TemplateData {
 		CurrentYear:     time.Now().Year(),
 		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
 		IsAuthenticated: app.isAuthenticated(r),
+		CurrentUserID:   app.sessionManager.GetString(r.Context(), "authenticatedUserID"),
 		CSRFToken:       nosurf.Token(r),
 	}
 }
@@ -39,8 +42,16 @@ func humanDate(t time.Time) string {
 	return t.UTC().Format("02 Jan 2006 at 15:04")
 }
 
+func isSnippetOwnedByCurrentUser(snippetID primitive.ObjectID, userID string) bool {
+	if userID == "" {
+		return false
+	}
+	return snippetID.Hex() == userID
+}
+
 var functions = template.FuncMap{
-	"humanDate": humanDate,
+	"humanDate":                   humanDate,
+	"isSnippetOwnedByCurrentUser": isSnippetOwnedByCurrentUser,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

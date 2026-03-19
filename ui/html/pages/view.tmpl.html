@@ -14,4 +14,14 @@
             </div>
         </div>
     {{end}}
+    {{if isSnippetOwnedByCurrentUser .Snippet.UserID .CurrentUserID}}
+    <div class="snippet-actions">
+        <a href="/edit/{{.Snippet.ID.Hex}}" class="btn btn-edit">Edit</a>
+
+        <form action="/snippet/delete/{{.Snippet.ID.Hex}}" method="post">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <button type="submit" class="btn btn-delete">Delete</button>
+        </form>
+    </div>
+    {{end}}
 {{end}}
