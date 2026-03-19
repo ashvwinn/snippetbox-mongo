@@ -206,7 +206,7 @@ textarea {
     height: 266px;
 }
 
-button {
+button:not(.btn) {
     background: none;
     padding: 0;
     border: none;
@@ -214,7 +214,7 @@ button {
     text-decoration: none;
 }
 
-button:hover {
+button:not(.btn):hover {
     color: #4EB722;
     text-decoration: underline;
     cursor: pointer;
@@ -260,6 +260,61 @@ button:hover {
 
 .snippet .metadata time:last-child {
     float: right;
+}
+
+.snippet-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.snippet-actions form {
+    margin: 0;
+    padding: 0;
+    display: inline;
+}
+
+a.btn,
+button.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 3px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 18px;
+    font-family: "Ubuntu Mono", monospace;
+    line-height: 1.5;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+a.btn:hover,
+button.btn:hover {
+    text-decoration: none;
+}
+
+.btn-edit {
+    background-color: #3498db;
+    color: #FFFFFF;
+}
+
+.btn-edit:hover {
+    background-color: #2980b9;
+    color: #FFFFFF;
+}
+
+.btn-delete {
+    background-color: #e74c3c;
+    color: #FFFFFF;
+}
+
+.btn-delete:hover {
+    background-color: #c0392b;
+    color: #FFFFFF;
 }
 
 div.flash {
