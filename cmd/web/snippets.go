@@ -106,12 +106,6 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = app.users.AddSnippet(userId, snippetId)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
 	app.sessionManager.Put(r.Context(), "flash", "Snippet successfully created!")
 
 	http.Redirect(w, r, fmt.Sprintf("/snippet/view/%s", snippetId), http.StatusSeeOther)
@@ -125,7 +119,7 @@ func (app *application) snippetDeletePost(w http.ResponseWriter, r *http.Request
 	}
 
 	userId := app.sessionManager.GetString(r.Context(), "authenticatedUserID")
-	bool, err := app.users.IsSnippetOwner(userId, snippetId)
+	bool, err := app.snippets.CheckSnippetOwnership(snippetId, userId)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -147,12 +141,6 @@ func (app *application) snippetDeletePost(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = app.users.RemoveSnippet(userId, snippetId)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
 	app.sessionManager.Put(r.Context(), "flash", "Snippet deleted successfully!")
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -166,7 +154,7 @@ func (app *application) snippetEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userId := app.sessionManager.GetString(r.Context(), "authenticatedUserID")
-	bool, err := app.users.IsSnippetOwner(userId, snippetId)
+	bool, err := app.snippets.CheckSnippetOwnership(snippetId, userId)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

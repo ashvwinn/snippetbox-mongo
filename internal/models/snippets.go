@@ -18,6 +18,7 @@ type SnippetModelInterface interface {
 	Latest() ([]Snippet, error)
 	Delete(id string) error
 	Update(id, title, content string, expires int) error
+	CheckSnippetOwnership(snippetID, userID string) (bool, error)
 }
 
 type Snippet struct {
@@ -190,4 +191,28 @@ func (m *SnippetModel) Update(id, title, content string, expires int) error {
 	}
 
 	return nil
+}
+
+func (m *SnippetModel) CheckSnippetOwnership(snippetID, userID string) (bool, error) {
+	snippetObjID, err := primitive.ObjectIDFromHex(snippetID)
+	if err != nil {
+		return false, err
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return false, err
+	}
+
+	var s Snippet
+	filter := bson.M{"_id": snippetObjID}
+	err = m.Snippets.FindOne(context.TODO(), filter).Decode(&s)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, ErrNoRecord
+		}
+		return false, err
+	}
+
+	return s.UserID == userObjID, nil
 }
